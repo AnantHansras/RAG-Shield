@@ -2,7 +2,7 @@
 from time import time
 
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_groq import ChatGroq
+from langchain_google_genai import ChatGoogleGenerativeAI
 from pydantic import BaseModel, Field
 from typing import Literal
 from app.config import settings
@@ -32,10 +32,10 @@ def invoke_with_retry(chain, payload, max_retries=5):
     )
 
 
-llm = ChatGroq(
-    model=settings.LLM_MODEL,
+llm = ChatGoogleGenerativeAI(
+    model=settings.GEMINI_LLM_MODEL,
     temperature=0.7,
-    groq_api_key=settings.GROQ_API_KEY,
+    google_api_key=settings.GOOGLE_API_KEY,
 )
 class CheckResponseOutput(BaseModel):
     decision: Literal[1, 2, 3] = Field(

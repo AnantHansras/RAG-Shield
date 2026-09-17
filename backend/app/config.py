@@ -4,7 +4,12 @@ load_dotenv()
 
 
 class Settings:
-
+    GOOGLE_API_KEY = os.getenv(
+        "GOOGLE_API_KEY"
+    )
+    GEMINI_LLM_MODEL = os.getenv(
+        "GEMINI_LLM_MODEL"
+    )
     GROQ_API_KEY = os.getenv(
         "GROQ_API_KEY"
     )
