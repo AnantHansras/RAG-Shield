@@ -9,8 +9,13 @@ import {
   FileText,
   X,
   ShieldAlert,
+  Sparkles,
 } from "lucide-react";
-import { generatePoisonedDocuments, injectPoisonedDocuments } from "../api/attack.js";
+import {
+  generatePoisonedDocuments,
+  refinePoisonedDocuments,
+  injectPoisonedDocuments,
+} from "../api/attack.js";
 
 function parseAttackFile(text) {
   const lines = text
@@ -46,13 +51,17 @@ export default function Attack() {
   const fileInputRef = useRef(null);
 
   const [generating, setGenerating] = useState(false);
-  const [poisonedDocs, setPoisonedDocs] = useState(null); // array of { targetQuery, correctAnswer, incorrectAnswer, a1, a2 }
+  const [poisonedDocs, setPoisonedDocs] = useState(null); // initial-stage docs
+
+  const [refining, setRefining] = useState(false);
+  const [finalDocs, setFinalDocs] = useState(null); // refined/final-stage docs
 
   const [injecting, setInjecting] = useState(false);
   const [injected, setInjected] = useState(false);
 
   const resetDownstream = () => {
     setPoisonedDocs(null);
+    setFinalDocs(null);
     setInjected(false);
   };
 
@@ -109,12 +118,26 @@ export default function Attack() {
     }
   };
 
+  const handleGenerateFinal = async () => {
+    if (!poisonedDocs || refining) return;
+    setRefining(true);
+    setFinalDocs(null);
+    setInjected(false);
+    try {
+      const data = await refinePoisonedDocuments(poisonedDocs);
+      setFinalDocs(data);
+    } finally {
+      setRefining(false);
+    }
+  };
+
   const handleInject = async () => {
-    if (!poisonedDocs || injecting) return;
+    const docsToInject = finalDocs || poisonedDocs;
+    if (!docsToInject || injecting) return;
     setInjecting(true);
     setInjected(false);
     try {
-      await injectPoisonedDocuments(poisonedDocs);
+      await injectPoisonedDocuments(docsToInject);
       setInjected(true);
     } finally {
       setInjecting(false);
@@ -122,6 +145,7 @@ export default function Attack() {
   };
 
   const isBatch = poisonedDocs && poisonedDocs.length > 1;
+  const injectableDocs = finalDocs || poisonedDocs;
 
   return (
     <div className="min-h-screen w-full">
@@ -274,7 +298,7 @@ export default function Attack() {
             disabled={!canGenerate || generating}
             className="inline-flex items-center gap-2 rounded-md bg-danger px-5 py-3 text-sm font-medium text-[#1b120e] transition-colors hover:bg-danger/80 disabled:cursor-not-allowed disabled:bg-disabled disabled:text-surface"
           >
-            Generate Poisoned Documents
+            Generate Initial Poisoned Documents
             {inputMode === "upload" && records.length > 0 && ` (${records.length})`}
           </button>
         </form>
@@ -286,35 +310,46 @@ export default function Attack() {
           </div>
         )}
 
+        
         {poisonedDocs && (
           <div className="mt-11 border-t border-border pt-9">
-            <h2 className="mb-1 text-lg font-semibold text-ink">Generated Poisoned Documents</h2>
+            <h2 className="mb-1 text-lg font-semibold text-ink">Initial Poisoned Documents</h2>
             <p className="mb-6 text-[13.5px] text-ink-soft">
-              Review the synthetic documents before injecting them into the knowledge base.
+              Draft documents. Refine them before injecting into the knowledge base.
             </p>
 
-            <div className="flex flex-col gap-6">
-              {poisonedDocs.map((doc, i) => (
-                <div key={i}>
-                  {isBatch && (
-                    <div className="mb-2.5 truncate text-[12.5px] font-medium text-ink-soft">
-                      Query {i + 1}: <span className="text-ink">{doc.targetQuery}</span>
-                    </div>
-                  )}
-                  <div className="grid grid-cols-2 gap-4 max-[860px]:grid-cols-1">
-                    {[doc.a1, doc.a2].map((d) => (
-                      <div key={d.id} className="rounded-md border border-danger/30 bg-danger/10 p-4">
-                        <div className="mb-2 flex items-center gap-1.5 text-[13px] font-semibold text-danger">
-                          <FileWarning size={14} />
-                          {d.title}
-                        </div>
-                        <p className="text-[13px] leading-relaxed text-ink-soft">{d.content}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
+            <DocGrid docs={poisonedDocs} isBatch={isBatch} />
+
+            {!finalDocs && (
+              <button
+                type="button"
+                onClick={handleGenerateFinal}
+                disabled={refining}
+                className="mt-6 inline-flex items-center gap-2 rounded-md bg-danger px-5 py-3 text-sm font-medium text-[#1b120e] transition-colors hover:bg-danger/80 disabled:cursor-not-allowed disabled:bg-disabled disabled:text-surface"
+              >
+                <Sparkles size={14} />
+                Generate Final Poisoned Documents
+              </button>
+            )}
+
+            {refining && (
+              <div className="mt-4 flex items-center gap-2.5 text-[13.5px] text-ink-soft">
+                <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-border-strong border-t-accent" />
+                Refining documents…
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Stage 2: refined/final docs */}
+        {finalDocs && (
+          <div className="mt-11 border-t border-border pt-9">
+            <h2 className="mb-1 text-lg font-semibold text-ink">Final Poisoned Documents</h2>
+            <p className="mb-6 text-[13.5px] text-ink-soft">
+              Refined versions, ready for injection into the vector database.
+            </p>
+
+            <DocGrid2 docs={finalDocs} isBatch={isBatch} />
 
             {!injected && (
               <button
@@ -323,7 +358,7 @@ export default function Attack() {
                 disabled={injecting}
                 className="mt-6 inline-flex items-center gap-2 rounded-md bg-danger px-5 py-3 text-sm font-medium text-[#1b120e] transition-colors hover:bg-danger/80 disabled:cursor-not-allowed disabled:bg-disabled disabled:text-surface"
               >
-                {isBatch ? `Inject All (${poisonedDocs.length})` : "Inject"}
+                {isBatch ? `Inject All (${finalDocs.length})` : "Inject"}
               </button>
             )}
 
@@ -336,42 +371,9 @@ export default function Attack() {
           </div>
         )}
 
-        {injected && (
+        {/* Stage 3: injected */}
+        {injected && injectableDocs && (
           <div className="mt-11 border-t border-border pt-9">
-            <h2 className="mb-1 text-lg font-semibold text-ink">Injected Documents</h2>
-            <p className="mb-6 text-[13.5px] text-ink-soft">
-              The following poisoned document{isBatch ? "s were" : " was"} added to the vector
-              database.
-            </p>
-
-            <div className="flex flex-col gap-6">
-              {poisonedDocs.map((doc, i) => (
-                <div key={i}>
-                  {isBatch && (
-                    <div className="mb-2.5 truncate text-[12.5px] font-medium text-ink-soft">
-                      Query {i + 1}: <span className="text-ink">{doc.targetQuery}</span>
-                    </div>
-                  )}
-                  <div className="grid grid-cols-2 gap-4 max-[860px]:grid-cols-1">
-                    {[doc.a1, doc.a2].map((d) => (
-                      <div key={d.id} className="rounded-md border border-danger/30 bg-danger/10 p-4">
-                        <div className="mb-2 flex items-center justify-between gap-2 text-[13px] font-semibold text-danger">
-                          <span className="flex items-center gap-1.5">
-                            <FileWarning size={14} />
-                            {d.title}
-                          </span>
-                          <span className="flex items-center gap-1 text-[11px] font-medium text-success">
-                            <CheckCircle2 size={12} /> Injected
-                          </span>
-                        </div>
-                        <p className="text-[13px] leading-relaxed text-ink-soft">{d.content}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-
             <div className="mt-5 mb-5 flex items-center gap-2.5 rounded-md border border-danger/30 bg-danger/10 px-4 py-3.5 text-[13.5px] font-medium text-danger">
               <CheckCircle2 size={15} />
               Injection Complete
@@ -379,6 +381,75 @@ export default function Attack() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function DocGrid({ docs, isBatch, injected = false }) {
+  return (
+    <div className="flex flex-col gap-6">
+      {docs.map((doc, i) => (
+        <div key={i}>
+          {isBatch && (
+            <div className="mb-2.5 truncate text-[12.5px] font-medium text-ink-soft">
+              Query {i + 1}: <span className="text-ink">{doc.targetQuery}</span>
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-4 max-[860px]:grid-cols-1">
+            {[doc.a1, doc.a2].map((d) => (
+              <div key={d.id} className="rounded-md border border-danger/30 bg-danger/10 p-4">
+                <div className="mb-2 flex items-center justify-between gap-2 text-[13px] font-semibold text-danger">
+                  <span className="flex items-center gap-1.5">
+                    <FileWarning size={14} />
+                    {d.title}
+                  </span>
+                  {injected && (
+                    <span className="flex items-center gap-1 text-[11px] font-medium text-success">
+                      <CheckCircle2 size={12} /> Injected
+                    </span>
+                  )}
+                </div>
+                <p className="text-[13px] leading-relaxed text-ink-soft">{d.content}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function DocGrid2({ docs, isBatch }) {
+  return (
+    <div className="flex flex-col gap-6">
+      {docs.results.map((doc, i) => (
+        <div key={i}>
+          {isBatch && (
+            <div className="mb-2.5 truncate text-[12.5px] font-medium text-ink-soft">
+              Query {i + 1}:{" "}
+              <span className="text-ink">{doc.targetQuery}</span>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 gap-4">
+            <div
+              key={doc.document.id}
+              className="rounded-md border border-danger/30 bg-danger/10 p-4"
+            >
+              <div className="mb-2 flex items-center justify-between gap-2 text-[13px] font-semibold text-danger">
+                <span className="flex items-center gap-1.5">
+                  <FileWarning size={14} />
+                  {doc.document.title}
+                </span>
+              </div>
+
+              <p className="text-[13px] leading-relaxed text-ink-soft">
+                {doc.document.content}
+              </p>
+            </div>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

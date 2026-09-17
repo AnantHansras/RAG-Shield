@@ -1,5 +1,5 @@
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_groq import ChatGroq
 
 from app.config import settings
 
@@ -32,10 +32,10 @@ User question:
 """
 
 
-llm = ChatGoogleGenerativeAI(
-    model=settings.LLM_MODEL,
-    temperature=0,
-    google_api_key=settings.GOOGLE_API_KEY,
+llm = ChatGroq(
+model=settings.LLM_MODEL,
+temperature=0.7,
+groq_api_key=settings.GROQ_API_KEY,
 )
 
 

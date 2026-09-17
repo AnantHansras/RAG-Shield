@@ -3,11 +3,16 @@ from typing import List
 from pydantic import BaseModel
 
 
+class QueryItem(BaseModel):
+    query: str
+    correct_answer: str
+
+
 class EvaluateRequest(BaseModel):
     """Body sent by `evaluateSystem()` in src/api/evaluate.js."""
 
     mode: str
-    queries: List[str]
+    queries: List[QueryItem]
 
 
 class PerQueryResult(BaseModel):

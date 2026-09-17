@@ -34,8 +34,7 @@ class InjectRecord(BaseModel):
     targetQuery: str
     correctAnswer: Optional[str] = None
     incorrectAnswer: Optional[str] = None
-    a1: PoisonedDocument
-    a2: PoisonedDocument
+    document: PoisonedDocument
 
 
 class InjectRequest(BaseModel):
@@ -55,3 +54,19 @@ class InjectResultItem(BaseModel):
 
 class InjectResponse(BaseModel):
     results: List[InjectResultItem]
+
+class RefinedDocument(BaseModel):
+    id: str
+    title: str
+    content: str
+
+
+class RefinedRecord(BaseModel):
+    targetQuery: str
+    correctAnswer: str
+    incorrectAnswer: str
+    document: RefinedDocument
+
+
+class RefineResponse(BaseModel):
+    results: List[RefinedRecord]

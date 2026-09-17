@@ -1,3 +1,5 @@
+from time import time
+
 from fastapi import APIRouter 
 from uuid import uuid4 
  
@@ -8,12 +10,16 @@ from app.schemas.attack import (
     InjectRequest, 
     InjectResponse, 
     InjectResultItem, 
-    PoisonedDocument, 
-    RetrievedDocument, 
+    PoisonedDocument,
+    RefineResponse,
+    RefinedDocument,
+    RefinedRecord, 
 ) 
  
 from app.services.broken_bags import ( 
-    generate_poisoned_documents, 
+    checkResponse,
+    generate_poisoned_documents,
+    generateA3, 
 ) 
  
 from app.services.attack_injection import ( 
@@ -38,7 +44,7 @@ def generate(
     results = [] 
  
     for record in payload.records: 
- 
+        
         generated = generate_poisoned_documents( 
             question=record.targetQuery, 
             correct_answer=record.correctAnswer, 
@@ -67,11 +73,71 @@ def generate(
                 ), 
             ) 
         ) 
- 
+
     return GenerateResponse( 
         results=results 
     ) 
- 
+
+@router.post(
+    "/refine",
+    response_model=RefineResponse,
+)
+def refine(
+    payload: GenerateResponse,
+) -> RefineResponse:
+
+    results = []
+
+    for record in payload.results:
+
+        decision = checkResponse(record.targetQuery,
+            record.a1,
+            record.a2,
+        )
+
+        if decision == 1:
+            document = RefinedDocument(
+                id=record.a1.id,
+                title="A1",
+                content=record.a1.content,
+            )
+
+        elif decision == 2:
+            document = RefinedDocument(
+                id=record.a2.id,
+                title="A2",
+                content=record.a2.content,
+            )
+
+        elif decision == 3:
+
+            a3 = generateA3(
+                question=record.targetQuery,
+                a1=record.a1,
+                a2=record.a2,
+            )
+
+            document = RefinedDocument(
+                id=a3.id,
+                title="A3",
+                content=a3,
+            )
+
+        else:
+            raise ValueError(
+                f"Invalid response from checkResponse: {decision}"
+            )
+
+        results.append(
+            RefinedRecord(
+                targetQuery=record.targetQuery,
+                correctAnswer=record.correctAnswer,
+                incorrectAnswer=record.incorrectAnswer,
+                document=document,
+            )
+        )
+
+    return RefineResponse(results=results)
  
 @router.post( 
     "/inject", 
@@ -86,8 +152,7 @@ def inject(
     for record in payload.records: 
  
         inject_poisoned_documents( 
-            a1=record.a1, 
-            a2=record.a2, 
+            doc=record.document 
         ) 
  
         results.append( 
@@ -98,4 +163,4 @@ def inject(
  
     return InjectResponse( 
         results=results 
-    ) 
+    )

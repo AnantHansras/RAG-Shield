@@ -8,6 +8,7 @@ export default function SystemEvaluation() {
   const [mode, setMode] = useState("normal");
   const [fileName, setFileName] = useState(null);
   const [queries, setQueries] = useState([]);
+  const [parseError, setParseError] = useState(null);
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState(null);
   const [dragActive, setDragActive] = useState(false);
@@ -20,13 +21,37 @@ export default function SystemEvaluation() {
     const reader = new FileReader();
     reader.onload = () => {
       const text = String(reader.result || "");
-      const lines = text
+      const rawLines = text
         .split(/\r?\n/)
-        .map((l) => l.replace(/^"|"$/g, "").trim())
+        .map((l) => l.trim())
         .filter(Boolean);
-      setQueries(lines);
+
+      const parsed = [];
+      let skipped = 0;
+
+      for (const line of rawLines) {
+        const commaIndex = line.indexOf(",");
+        if (commaIndex === -1) {
+          skipped++;
+          continue;
+        }
+        const query = line.slice(0, commaIndex).replace(/^"|"$/g, "").trim();
+        const correct_answer = line.slice(commaIndex + 1).replace(/^"|"$/g, "").trim();
+        if (!query || !correct_answer) {
+          skipped++;
+          continue;
+        }
+        parsed.push({ query, correct_answer });
+      }
+
+      setQueries(parsed);
       setFileName(file.name);
       setResult(null);
+      setParseError(
+        skipped > 0
+          ? `Skipped ${skipped} line${skipped === 1 ? "" : "s"} missing a query or correct_answer.`
+          : null
+      );
     };
     reader.readAsText(file);
   };
@@ -45,6 +70,7 @@ export default function SystemEvaluation() {
     setFileName(null);
     setQueries([]);
     setResult(null);
+    setParseError(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -101,7 +127,10 @@ export default function SystemEvaluation() {
 
           <div className="mb-5">
             <label className="mb-2 block text-[13px] font-medium text-ink">
-              Queries <span className="ml-1.5 text-xs font-normal text-ink-faint">.txt or .csv, one query per line</span>
+              Queries{" "}
+              <span className="ml-1.5 text-xs font-normal text-ink-faint">
+                .txt or .csv, one "query,correct_answer" pair per line
+              </span>
             </label>
 
             {!fileName ? (
@@ -121,7 +150,9 @@ export default function SystemEvaluation() {
                 <div className="text-sm text-ink-soft">
                   <span className="font-medium text-accent-ink">Click to upload</span> or drag and drop
                 </div>
-                <div className="text-xs text-ink-faint">Handles files with thousands of queries</div>
+                <div className="text-xs text-ink-faint">
+                  Each line: <code>query,correct_answer</code> — handles files with thousands of rows
+                </div>
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -145,6 +176,10 @@ export default function SystemEvaluation() {
                   <X size={14} />
                 </button>
               </div>
+            )}
+
+            {parseError && (
+              <p className="mt-2 text-xs text-danger">{parseError}</p>
             )}
           </div>
 

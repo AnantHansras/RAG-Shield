@@ -4,28 +4,17 @@ from app.rag.vectorstore import get_vectorstore
 
 
 def inject_poisoned_documents(
-    a1,
-    a2,
+    doc,
 ):
 
 
     documents = [
         Document(
-            page_content=a1.content,
+            page_content=doc.content,
             metadata={
-                "id": a1.id,
-                "name": a1.title,
-                "title": a1.title,
-                "isPoisoned": True,
-                "attack_type": "broken_bags",
-            },
-        ),
-        Document(
-            page_content=a2.content,
-            metadata={
-                "id": a2.id,
-                "name": a2.title,
-                "title": a2.title,
+                "id": doc.id,
+                "name": doc.title,
+                "title": doc.title,
                 "isPoisoned": True,
                 "attack_type": "broken_bags",
             },
@@ -33,8 +22,7 @@ def inject_poisoned_documents(
     ]
 
     ids = [
-        a1.id,
-        a2.id,
+        doc.id,
     ]
 
     vectorstore = get_vectorstore()
@@ -44,6 +32,5 @@ def inject_poisoned_documents(
     )
 
     return {
-        "a1_id": a1.id,
-        "a2_id": a2.id,
+        "doc_id": doc.id,
     }

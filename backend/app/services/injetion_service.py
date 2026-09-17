@@ -9,13 +9,16 @@ from app.config import settings
 from app.rag.vectorstore import get_vectorstore
 
 
+BATCH_SIZE = 5000
+
+
 def load_documents():
 
     documents = []
 
     dataset_path = os.path.join(
         settings.DOCUMENTS_DIR,
-        "NQ-open.dev.jsonl",
+        "NQ-open.train.jsonl",
     )
 
     if not os.path.exists(settings.DOCUMENTS_DIR):
@@ -37,8 +40,6 @@ def load_documents():
     ) as file:
 
         for line_number, line in enumerate(file, start=1):
-            if len(documents) >= 100:
-                break
             line = line.strip()
 
             if not line:
@@ -76,7 +77,7 @@ def load_documents():
             document = Document(
                 page_content=content,
                 metadata={
-                    "filename": "NQ-open.dev.jsonl",
+                    "filename": "NQ-open.train.jsonl",
                     "source": dataset_path,
                     "question": question,
                 },
@@ -148,12 +149,20 @@ def ingest_documents():
             "chunks": 0,
         }
 
+    print(
+        f"[INGESTION] Loaded {len(documents)} documents."
+    )
+
     chunks = split_documents(
         documents
     )
 
     chunks = prepare_metadata(
         chunks
+    )
+
+    print(
+        f"[INGESTION] Created {len(chunks)} chunks."
     )
 
     vectorstore = get_vectorstore()
@@ -163,9 +172,40 @@ def ingest_documents():
         for chunk in chunks
     ]
 
-    vectorstore.add_documents(
-        documents=chunks,
-        ids=ids,
+    total_chunks = len(chunks)
+
+    for start in range(
+        0,
+        total_chunks,
+        BATCH_SIZE,
+    ):
+
+        end = min(
+            start + BATCH_SIZE,
+            total_chunks,
+        )
+
+        batch_documents = chunks[start:end]
+        batch_ids = ids[start:end]
+
+        print(
+            f"[INGESTION] Adding chunks "
+            f"{start + 1}-{end} "
+            f"of {total_chunks}..."
+        )
+
+        vectorstore.add_documents(
+            documents=batch_documents,
+            ids=batch_ids,
+        )
+
+        print(
+            f"[INGESTION] Progress: "
+            f"{end}/{total_chunks} chunks added."
+        )
+
+    print(
+        "[INGESTION] All documents successfully ingested."
     )
 
     return {

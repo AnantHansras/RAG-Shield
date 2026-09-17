@@ -29,12 +29,13 @@ export async function generatePoisonedDocuments(records) {
 // Body: { records: [{ targetQuery, correctAnswer, incorrectAnswer, a1, a2 }] }
 // Response: { results: [{ targetQuery, before: [...], after: [...], enteredTopK }] }
 export async function injectPoisonedDocuments(records) {
+  console.log(JSON.stringify({ records: records.results }));
   const response = await fetch("/api/attack/inject", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ records }),
+    body: JSON.stringify({ records: records.results }),
   });
 
   if (!response.ok) {
@@ -45,3 +46,13 @@ export async function injectPoisonedDocuments(records) {
   return data.results;
 }
 
+export async function refinePoisonedDocuments(results) {
+  console.log(JSON.stringify({ results }));
+  const res = await fetch("/api/attack/refine", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ results }),
+  });
+  if (!res.ok) throw new Error("Failed to refine poisoned documents");
+  return res.json();
+}
